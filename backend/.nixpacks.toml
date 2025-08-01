@@ -1,9 +1,11 @@
 [phases.setup]
-nixPkgs = ["tesseract5"]
+# This line tells the system to install the Tesseract engine and its language data.
+# This is where the requirement for the Tesseract program goes.
+nixPkgs = ["tesseract5", "tessdata"]
 
 [phases.install]
+# This line tells pip to install the Python libraries from your requirements file.
 cmds = ["pip install -r requirements.txt"]
 
 [phases.start]
-# Debug Step: Check if tesseract exists and what the PATH variable is
-cmd = "which tesseract && echo '---' && echo $PATH"
+cmd = "python app.py"

@@ -57,7 +57,8 @@ export default function InvoiceAnalyzerPage() {
 
         try {
             // This URL should point to your separate Python backend
-            const response = await fetch('http://127.0.0.1:5000/api/extract', {
+            const response = await fetch('https://appealing-strength-production.up.railway.app/api/extract
+', {
                 method: 'POST',
                 body: formData,
             });

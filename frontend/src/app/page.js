@@ -15,7 +15,6 @@ const DocumentIcon = () => (
     </svg>
 );
 
-// --- A more engaging, "fancy" loader ---
 const FancyLoader = ({ statusText }) => (
     <div className="flex flex-col items-center justify-center space-y-4">
         <div className="relative w-16 h-16">
@@ -26,9 +25,7 @@ const FancyLoader = ({ statusText }) => (
     </div>
 );
 
-// --- Component to display the results in a clean table ---
 const ResultsTable = ({ data }) => {
-    // Function to format keys from camelCase to Title Case
     const formatKey = (key) => key.replace(/([A-Z])/g, ' $1').replace(/^./, (str) => str.toUpperCase());
 
     return (
@@ -47,6 +44,7 @@ const ResultsTable = ({ data }) => {
     );
 };
 
+
 // --- Main App Component ---
 export default function InvoiceAnalyzerPage() {
     const [uploadedFile, setUploadedFile] = useState(null);
@@ -59,23 +57,21 @@ export default function InvoiceAnalyzerPage() {
     // Effect for dynamic status text during processing
     useEffect(() => {
         let intervalId;
-        if (status === 'processing') {
+        if (status === 'processing' && statusText === 'Sending to server for analysis...') {
             const messages = [
-                'Uploading file securely...',
                 'Preprocessing document...',
                 'AI engine is analyzing layout...',
                 'Extracting key-value pairs...',
                 'Finalizing results...'
             ];
             let messageIndex = 0;
-            setStatusText(messages[messageIndex]);
             intervalId = setInterval(() => {
-                messageIndex = (messageIndex + 1) % messages.length;
-                setStatusText(messages[messageIndex]);
+                setStatusText(messages[messageIndex % messages.length]);
+                messageIndex++;
             }, 2500);
         }
         return () => clearInterval(intervalId);
-    }, [status]);
+    }, [status, statusText]);
 
     const handleFileChange = (file) => {
         if (file && file.type === 'application/pdf') {
@@ -90,16 +86,9 @@ export default function InvoiceAnalyzerPage() {
         }
     };
     
-    // --- Drag and Drop Handlers ---
-    const handleDragEnter = (e) => {
-        e.preventDefault();
-        setIsDragging(true);
-    };
-    const handleDragLeave = (e) => {
-        e.preventDefault();
-        setIsDragging(false);
-    };
-    const handleDragOver = (e) => e.preventDefault(); // Necessary to allow drop
+    const handleDragEnter = (e) => { e.preventDefault(); setIsDragging(true); };
+    const handleDragLeave = (e) => { e.preventDefault(); setIsDragging(false); };
+    const handleDragOver = (e) => e.preventDefault();
     const handleDrop = (e) => {
         e.preventDefault();
         setIsDragging(false);
@@ -108,6 +97,7 @@ export default function InvoiceAnalyzerPage() {
         }
     };
 
+    // --- YOUR ORIGINAL DATA FETCHING LOGIC ---
     const processFile = async () => {
         if (!uploadedFile) {
             alert("Please select a file first.");
@@ -115,20 +105,23 @@ export default function InvoiceAnalyzerPage() {
         }
 
         setStatus('processing');
+        setStatusText('Sending to server for analysis...');
         setExtractedData(null);
 
         try {
             const formData = new FormData();
             formData.append('file', uploadedFile);
-            
-            // API Endpoint from environment variables for best practice
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://appealing-strength-production.up.railway.app/api/extract';
 
-            const response = await fetch(apiUrl, { method: 'POST', body: formData });
+            const apiUrl = `https://appealing-strength-production.up.railway.app/api/extract`;
+
+            const response = await fetch(apiUrl, {
+                method: 'POST',
+                body: formData,
+            });
 
             if (!response.ok) {
                 const errorData = await response.json();
-                throw new Error(errorData.error || 'An unexpected error occurred on the server.');
+                throw new Error(errorData.error || 'An error occurred on the server.');
             }
 
             const data = await response.json();
@@ -137,7 +130,7 @@ export default function InvoiceAnalyzerPage() {
         } catch (error) {
             console.error("Error processing file:", error);
             setStatus('error');
-            setStatusText(error.message || 'Failed to connect to the server.');
+            setStatusText(error.message || 'An unknown error occurred.');
         }
     };
     
@@ -170,7 +163,6 @@ export default function InvoiceAnalyzerPage() {
 
     return (
         <div className="bg-gray-50 text-gray-900 min-h-screen font-sans" onDragEnter={handleDragEnter}>
-            {/* Full page drag-and-drop overlay */}
             {isDragging && (
                 <div 
                     className="fixed inset-0 bg-blue-500 bg-opacity-20 backdrop-blur-sm flex items-center justify-center z-50"
@@ -193,7 +185,6 @@ export default function InvoiceAnalyzerPage() {
                     </header>
 
                     <main className="bg-white p-6 sm:p-8 rounded-2xl shadow-lg border border-gray-200 transition-all">
-                        {/* Show results if successful */}
                         {status === 'success' && extractedData ? (
                             <div>
                                 <h2 className="text-2xl font-bold mb-4 text-center text-gray-800">Extraction Results</h2>
@@ -204,7 +195,6 @@ export default function InvoiceAnalyzerPage() {
                                 </div>
                             </div>
                         ) : (
-                            // Show uploader and status views otherwise
                             <div>
                                 <div
                                     className={`group border-2 border-dashed ${status === 'processing' ? 'border-gray-300' : 'border-gray-300 hover:border-blue-500'} rounded-xl p-6 text-center cursor-pointer transition-all mb-6`}

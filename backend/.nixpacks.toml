@@ -1,8 +1,10 @@
 [phases.setup]
-nixPkgs = ["tesseract", "tessdata"]
+# We add findutils to get access to the 'find' command
+nixPkgs = ["tesseract", "tessdata", "findutils"]
 
 [phases.install]
 cmds = ["pip install -r requirements.txt"]
 
 [phases.start]
-cmd = "python app.py"
+# Find the tessdata path, export it as an environment variable, and then start the app
+cmd = "export TESSDATA_PREFIX=$(find /nix/store -name tessdata | head -n 1) && python app.py"

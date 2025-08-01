@@ -43,7 +43,7 @@ def intelligent_parse(text, paragraphs):
     if paragraphs:
         data['Supplier Name'] = paragraphs[0].split('\n')[0].strip()
         data['Supplier Address'] = clean_address_block(paragraphs[0])
-    
+
     if len(paragraphs) > 1:
         bill_to_regex = re.compile(r'(?:bill to|billed to|ship to|aarti drugs ltd)', re.IGNORECASE)
         customer_block = paragraphs[1] # Default to the second block
@@ -89,7 +89,7 @@ def intelligent_parse(text, paragraphs):
                     break
             if amount_found:
                 break
-    
+
     # Fallback if the contextual search fails
     if not amount_found:
         amounts = re.findall(r'(\d{1,3}(?:,?\d{3})*(?:\.\d{2}))', text)
@@ -104,33 +104,33 @@ def intelligent_parse(text, paragraphs):
 def extract_invoice_data():
     if 'file' not in request.files:
         return jsonify({'error': 'No file part in the request'}), 400
-    
+
     file = request.files['file']
     if file.filename == '':
         return jsonify({'error': 'No file selected'}), 400
 
     try:
 
-        print("Tesseract PATH:", subprocess.getoutput("which tesseract"))
+        print("Tesseract PATH:", subprocess.getoutput("nix-store --query $(which tesseract)"))
         print("Tesseract VERSION:\n", subprocess.getoutput("tesseract --version"))
-        
+
         file_buffer = file.read()
 
         # Step 1: Use PyMuPDF to open the PDF from the buffer and render it as an image (CV Stage)
         pdf_document = fitz.open(stream=file_buffer, filetype="pdf")
         page = pdf_document.load_page(0)
-        pix = page.get_pixmap(dpi=300) 
+        pix = page.get_pixmap(dpi=300)
         img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
 
         # Step 2: Perform OCR on the image using pytesseract
         full_text = pytesseract.image_to_string(img)
-        
+
         # Create a simplified list of paragraphs for the parser
         paragraphs = full_text.split('\n\n')
-        
+
         # Step 3: Parse the OCR data with the intelligent model
         extracted_data = intelligent_parse(full_text, paragraphs)
-        
+
         # Step 4: Return the clean, structured data to the frontend
         return jsonify(extracted_data), 200
 
@@ -140,4 +140,4 @@ def extract_invoice_data():
 
 if __name__ == '__main__':
     app.run(host="0.0.0.0", port=5000, debug=True)
-    
+

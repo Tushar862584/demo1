@@ -5,4 +5,4 @@ nixPkgs = ["...", "python311", "tesseract"]
 cmds = ["pip install --upgrade pip", "pip install -r requirements.txt"]
 
 [phases.start]
-cmd = "python app.py"
+cmd = "export PYTESSERACT_TESSERACT_CMD=\"$(nix-store --query --outputs-only --referrers $(which tesseract) | grep tesseract | head -n 1)/bin/tesseract\" && python app.py"

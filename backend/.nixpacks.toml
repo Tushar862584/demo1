@@ -1,10 +1,9 @@
 [phases.setup]
-# We add findutils to get access to the 'find' command
-nixPkgs = ["tesseract", "tessdata", "findutils"]
+nixPkgs = ["tesseract5"]
 
 [phases.install]
 cmds = ["pip install -r requirements.txt"]
 
 [phases.start]
-# Find the tessdata path, export it as an environment variable, and then start the app
-cmd = "export TESSDATA_PREFIX=$(find /nix/store -name tessdata | head -n 1) && python app.py"
+# Debug Step: Check if tesseract exists and what the PATH variable is
+cmd = "which tesseract && echo '---' && echo $PATH"

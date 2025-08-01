@@ -55,13 +55,13 @@ export default function InvoiceAnalyzerPage() {
         const formData = new FormData();
         formData.append('file', uploadedFile);
 
-        try {
-            // This URL should point to your separate Python backend
-            const response = await fetch('https://appealing-strength-production.up.railway.app/api/extract
-', {
-                method: 'POST',
-                body: formData,
-            });
+        // Use the environment variable for a cleaner, more maintainable app
+        const apiUrl = `https://appealing-strength-production.up.railway.app/api/extract`;
+
+        const response = await fetch(apiUrl, {
+          method: 'POST',
+          body: formData,
+        });
 
             if (!response.ok) {
                 const errorData = await response.json();

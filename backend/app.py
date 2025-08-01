@@ -6,6 +6,7 @@ from PIL import Image # Pillow, for image handling
 import pytesseract   # For OCR
 import re            # For regular expressions
 import io            # For handling in-memory file operations
+import subprocess
 
 # --- Initialize the Flask Application ---
 app = Flask(__name__)
@@ -109,6 +110,10 @@ def extract_invoice_data():
         return jsonify({'error': 'No file selected'}), 400
 
     try:
+
+        print("Tesseract PATH:", subprocess.getoutput("which tesseract"))
+        print("Tesseract VERSION:\n", subprocess.getoutput("tesseract --version"))
+        
         file_buffer = file.read()
 
         # Step 1: Use PyMuPDF to open the PDF from the buffer and render it as an image (CV Stage)
@@ -135,3 +140,4 @@ def extract_invoice_data():
 
 if __name__ == '__main__':
     app.run(host="0.0.0.0", port=5000, debug=True)
+    

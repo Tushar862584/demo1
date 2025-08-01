@@ -52,16 +52,17 @@ export default function InvoiceAnalyzerPage() {
         setStatusText('Sending to server for analysis...');
         setExtractedData(null);
 
-        const formData = new FormData();
-        formData.append('file', uploadedFile);
+        try {
+            const formData = new FormData();
+            formData.append('file', uploadedFile);
 
-        // Use the environment variable for a cleaner, more maintainable app
-        const apiUrl = `https://appealing-strength-production.up.railway.app/api/extract`;
+            // Use the environment variable for a cleaner, more maintainable app
+            const apiUrl = `https://appealing-strength-production.up.railway.app/api/extract`;
 
-        const response = await fetch(apiUrl, {
-          method: 'POST',
-          body: formData,
-        });
+            const response = await fetch(apiUrl, {
+                method: 'POST',
+                body: formData,
+            });
 
             if (!response.ok) {
                 const errorData = await response.json();

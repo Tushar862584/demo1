@@ -12,7 +12,7 @@ app = Flask(__name__)
 # Enable Cross-Origin Resource Sharing (CORS) to allow your frontend to call this API.
 CORS(app)
 
-# --- The Intelligent Parsing Model ---
+# --- The Intelligent Parsing Model (No spaCy) ---
 # This function contains the advanced logic to extract data from the OCR text.
 def intelligent_parse(text, paragraphs):
     # This is the final data structure we want to populate.
@@ -25,6 +25,8 @@ def intelligent_parse(text, paragraphs):
         'Invoice Date': None,
         'Total Amount': None,
     }
+
+    lines = text.split('\n')
 
     # Helper function to clean address blocks by removing irrelevant lines.
     def clean_address_block(paragraph):
@@ -52,7 +54,10 @@ def intelligent_parse(text, paragraphs):
         data['Customer Address'] = clean_address_block(customer_block)
 
     # --- Multi-layered extraction for mandatory fields ---
-    id_match = re.search(r'"Receipt No\."\s*,\s*"([^"]+)"', text, re.IGNORECASE)
+    # This uses a hierarchical approach: try the most specific pattern first, then fall back to more general ones.
+
+    # 1. Invoice ID
+    id_match = re.search(r'"Receipt No\.[\s\S]*?"\s*,\s*"([^"]+)"', text, re.IGNORECASE)
     if id_match:
         data['Invoice ID'] = id_match.group(1).replace('\n', ' ').strip()
     else:
@@ -60,18 +65,32 @@ def intelligent_parse(text, paragraphs):
         if id_match:
             data['Invoice ID'] = id_match.group(1)
 
-    date_match = re.search(r'"Document Date"\s*,\s*"([^"]+)"', text, re.IGNORECASE)
+    # 2. Invoice Date
+    date_match = re.search(r'"Document Date[\s\S]*?"\s*,\s*"([^"]+)"', text, re.IGNORECASE)
     if date_match:
         data['Invoice Date'] = date_match.group(1).replace('\n', ' ').strip()
     else:
-        date_match = re.search(r'(\d{1,2}[-./]\s?\w+\s?[-./]\s?\d{4})', text, re.IGNORECASE)
+        # Improved regex to handle more date formats like "29. November 2024"
+        date_match = re.search(r'(\d{1,2}[-./\s]\s?\w+\s?[-./\s]\s?\d{4})', text, re.IGNORECASE)
         if date_match:
             data['Invoice Date'] = date_match.group(0)
 
-    amount_match = re.search(r'Payment Amount\s+INR\s+([\d,]+\.\d{2})', text, re.IGNORECASE)
-    if amount_match:
-        data['Total Amount'] = amount_match.group(1)
-    else:
+    # 3. Total Amount (Smarter Contextual Search)
+    amount_found = False
+    for i, line in enumerate(lines):
+        if 'payment amount' in line.lower():
+            # Search the current line and the next few lines for the amount
+            for subsequent_line in lines[i:i+4]:
+                amount_match = re.search(r'([\d,]+\.\d{2})', subsequent_line)
+                if amount_match:
+                    data['Total Amount'] = amount_match.group(1)
+                    amount_found = True
+                    break
+            if amount_found:
+                break
+    
+    # Fallback if the contextual search fails
+    if not amount_found:
         amounts = re.findall(r'(\d{1,3}(?:,?\d{3})*(?:\.\d{2}))', text)
         if amounts:
             numeric_amounts = [float(amount.replace(',', '')) for amount in amounts]
@@ -92,7 +111,7 @@ def extract_invoice_data():
     try:
         file_buffer = file.read()
 
-        # Step 1: Use PyMuPDF to open the PDF from the buffer and render it as an image
+        # Step 1: Use PyMuPDF to open the PDF from the buffer and render it as an image (CV Stage)
         pdf_document = fitz.open(stream=file_buffer, filetype="pdf")
         page = pdf_document.load_page(0)
         pix = page.get_pixmap(dpi=300) 
@@ -105,7 +124,6 @@ def extract_invoice_data():
         paragraphs = full_text.split('\n\n')
         
         # Step 3: Parse the OCR data with the intelligent model
-        # FIX: The function call now correctly passes two separate arguments.
         extracted_data = intelligent_parse(full_text, paragraphs)
         
         # Step 4: Return the clean, structured data to the frontend

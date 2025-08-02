@@ -182,7 +182,7 @@ export default function InvoiceAnalyzerPage() {
                     <header className="text-center mb-8">
                         <h1 className="text-3xl sm:text-4xl font-bold text-gray-800">Areliza AI</h1>
                         <p className="mt-2 text-md sm:text-lg text-gray-600">
-Effortlessly manage account receivables—instantly extract data from your PDF invoices with powerful AI.
+Areliza streamlines your account receivables by leveraging advanced AI to instantly extract data from PDF invoices.
 </p>
                     </header>
 
@@ -236,4 +236,5 @@ Effortlessly manage account receivables—instantly extract data from your PDF i
         </div>
     );
 }
+
 

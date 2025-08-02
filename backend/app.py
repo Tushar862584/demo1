@@ -16,8 +16,7 @@ CORS(app)
 # --- The Intelligent Parsing Model (No spaCy) ---
 # This function contains the advanced logic to extract data from the OCR text.
 def intelligent_parse(text, paragraphs):
-    import re
-
+    # This is the final data structure we want to populate.
     data = {
         'Supplier Name': None,
         'Supplier Address': None,
@@ -28,89 +27,77 @@ def intelligent_parse(text, paragraphs):
         'Total Amount': None,
     }
 
-    lines = text.splitlines()
-    lower_lines = [line.lower() for line in lines]
+    lines = text.split('\n')
 
-    # --- Supplier Name & Address ---
+    # Helper function to clean address blocks by removing irrelevant lines.
+    def clean_address_block(paragraph):
+        if not paragraph:
+            return None
+        lines = paragraph.split('\n')
+        unwanted_keywords = ['phone', 'e-mail', 'gst', 'www', 'payment voucher', 'page']
+        address_lines = [line for line in lines if line.strip() and not any(kw in line.lower() for kw in unwanted_keywords)]
+        # Limit to a reasonable number of lines to keep it clean
+        return '\n'.join(address_lines[:5])
+
+    # --- Heuristic for Supplier and Customer Name & Address ---
     if paragraphs:
-        supplier_block = paragraphs[0].strip()
-        supplier_lines = supplier_block.split('\n')
-        data['Supplier Name'] = supplier_lines[0].strip()
-        data['Supplier Address'] = '\n'.join([
-            line.strip() for line in supplier_lines[1:]
-            if line.strip() and not any(x in line.lower() for x in ['gstin', 'pan', 'email', 'phone', 'contact'])
-        ][:5])
+        data['Supplier Name'] = paragraphs[0].split('\n')[0].strip()
+        data['Supplier Address'] = clean_address_block(paragraphs[0])
 
-    # --- Customer Name & Address ---
-    bill_to_keywords = ['bill to', 'billed to', 'ship to', 'deliver to', 'customer', 'sold to']
-    customer_block = None
+    if len(paragraphs) > 1:
+        bill_to_regex = re.compile(r'(?:bill to|billed to|ship to|aarti drugs ltd)', re.IGNORECASE)
+        customer_block = paragraphs[1] # Default to the second block
+        for p in paragraphs:
+            if bill_to_regex.search(p):
+                customer_block = p
+                break
+        data['Customer Name'] = customer_block.split('\n')[0].strip()
+        data['Customer Address'] = clean_address_block(customer_block)
 
-    for para in paragraphs[1:]:
-        if any(keyword in para.lower() for keyword in bill_to_keywords):
-            customer_block = para.strip()
-            break
+    # --- Multi-layered extraction for mandatory fields ---
+    # This uses a hierarchical approach: try the most specific pattern first, then fall back to more general ones.
 
-    if customer_block:
-        cust_lines = customer_block.split('\n')
-        data['Customer Name'] = cust_lines[0].strip()
-        data['Customer Address'] = '\n'.join([
-            line.strip() for line in cust_lines[1:]
-            if line.strip() and not any(x in line.lower() for x in ['gstin', 'pan', 'email', 'phone', 'contact'])
-        ][:5])
+    # 1. Invoice ID
+    id_match = re.search(r'"Receipt No\.[\s\S]*?"\s*,\s*"([^"]+)"', text, re.IGNORECASE)
+    if id_match:
+        data['Invoice ID'] = id_match.group(1).replace('\n', ' ').strip()
+    else:
+        id_match = re.search(r'(?:invoice|receipt)\s?no[\s:.]*([a-z0-9\-\/]+)', text, re.IGNORECASE)
+        if id_match:
+            data['Invoice ID'] = id_match.group(1)
 
-    # --- Invoice ID Extraction ---
-    invoice_id = None
-    id_patterns = [
-        r'(?:invoice|receipt)\s*(?:no|number)[\s:.-]*([a-zA-Z0-9\-\/]+)',
-        r'Invoice[\s\S]{0,15}?[:\-]?\s*([A-Z0-9\-\/]{4,})',
-        r'"Receipt No\.[\s\S]*?"\s*,\s*"([^"]+)"'
-    ]
-    for pattern in id_patterns:
-        match = re.search(pattern, text, re.IGNORECASE)
-        if match:
-            invoice_id = match.group(1).strip()
-            break
-    data['Invoice ID'] = invoice_id
+    # 2. Invoice Date
+    date_match = re.search(r'"Document Date[\s\S]*?"\s*,\s*"([^"]+)"', text, re.IGNORECASE)
+    if date_match:
+        data['Invoice Date'] = date_match.group(1).replace('\n', ' ').strip()
+    else:
+        # Improved regex to handle more date formats like "29. November 2024"
+        date_match = re.search(r'(\d{1,2}[-./\s]\s?\w+\s?[-./\s]\s?\d{4})', text, re.IGNORECASE)
+        if date_match:
+            data['Invoice Date'] = date_match.group(0)
 
-    # --- Invoice Date Extraction ---
-    invoice_date = None
-    date_patterns = [
-        r'\b(?:invoice|date|document date)[\s:]*([\d]{1,2}[\/\-.][\d]{1,2}[\/\-.][\d]{2,4})',
-        r'\b(\d{1,2}[-/\s]\w+[-/\s]\d{2,4})',
-        r'\b(\w+\s+\d{1,2},\s+\d{4})'
-    ]
-    for pattern in date_patterns:
-        match = re.search(pattern, text, re.IGNORECASE)
-        if match:
-            invoice_date = match.group(1).strip()
-            break
-    data['Invoice Date'] = invoice_date
-
-    # --- Total Amount Extraction ---
-    total_keywords = ['grand total', 'total amount', 'amount due', 'amount payable', 'total', 'net amount']
-    total_amount = None
-    for i, line in enumerate(lower_lines):
-        if any(k in line for k in total_keywords):
-            for offset in range(0, 3):
-                if i + offset < len(lines):
-                    amt_match = re.search(r'₹?\s?([\d,]+\.\d{2})', lines[i + offset])
-                    if amt_match:
-                        total_amount = amt_match.group(1).strip()
-                        break
-            if total_amount:
+    # 3. Total Amount (Smarter Contextual Search)
+    amount_found = False
+    for i, line in enumerate(lines):
+        if 'payment amount' in line.lower():
+            # Search the current line and the next few lines for the amount
+            for subsequent_line in lines[i:i+4]:
+                amount_match = re.search(r'([\d,]+\.\d{2})', subsequent_line)
+                if amount_match:
+                    data['Total Amount'] = amount_match.group(1)
+                    amount_found = True
+                    break
+            if amount_found:
                 break
 
-    # Fallback: Pick highest numeric value
-    if not total_amount:
-        all_amounts = re.findall(r'₹?\s?([\d]{1,3}(?:,?\d{3})*(?:\.\d{2}))', text)
-        if all_amounts:
-            numeric_vals = [float(a.replace(',', '')) for a in all_amounts]
-            total_amount = f"{max(numeric_vals):.2f}"
-
-    data['Total Amount'] = total_amount
+    # Fallback if the contextual search fails
+    if not amount_found:
+        amounts = re.findall(r'(\d{1,3}(?:,?\d{3})*(?:\.\d{2}))', text)
+        if amounts:
+            numeric_amounts = [float(amount.replace(',', '')) for amount in amounts]
+            data['Total Amount'] = f"{max(numeric_amounts):.2f}"
 
     return data
-
 
 # --- The Main API Endpoint ---
 @app.route('/api/extract', methods=['POST'])

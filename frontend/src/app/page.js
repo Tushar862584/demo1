@@ -181,7 +181,9 @@ export default function InvoiceAnalyzerPage() {
                 <div className="w-full max-w-2xl lg:max-w-3xl">
                     <header className="text-center mb-8">
                         <h1 className="text-3xl sm:text-4xl font-bold text-gray-800">Apeliza AI</h1>
-                        <p className="mt-2 text-md sm:text-lg text-gray-600">Instantly extract data from your PDF invoices with our powerful AI.</p>
+                        <p className="mt-2 text-md sm:text-lg text-gray-600">
+Apeliza streamlines accounts payable—instantly extract data from your PDF invoices with powerful AI.
+</p>
                     </header>
 
                     <main className="bg-white p-6 sm:p-8 rounded-2xl shadow-lg border border-gray-200 transition-all">
